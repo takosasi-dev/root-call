@@ -100,6 +100,8 @@ func _input(event: InputEvent) -> void:
 			_touch_note.visible = true  # FR-29: タッチで開いた人に伝える
 			get_viewport().set_input_as_handled()
 			return
+		if event is InputEventMouseButton and event.device == InputEvent.DEVICE_ID_EMULATION:
+			return  # タッチから作られたマウスのイベント(FR-29 の案内を出したまま止まる)
 		if (event is InputEventKey or event is InputEventMouseButton) and event.pressed:
 			Sfx.unlock()  # FR-26: この入力は数えない
 			get_viewport().set_input_as_handled()
@@ -110,6 +112,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if not (event is InputEventKey):
 		return
+	if screen != "play" and (event.ctrl_pressed or event.meta_pressed or event.alt_pressed):
+		return  # 結果の枠の Ctrl+C などは部品に渡す(FR-27: ゲームの操作には数えない)
 	get_viewport().set_input_as_handled()  # Tab・矢印を Godot のフォーカスの移動に使わせない
 	if screen == "keys":
 		_keys_input(event)

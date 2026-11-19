@@ -13,7 +13,12 @@ try {
 	expect(!!s0, 'S0 が出る');
 	const loadedAt = Date.now();
 	await page.evaluate(`localStorage.setItem('parry-duel/save', '{"version":1,"keep":"me"}')`);
+	console.log(`    S0 が出るまで: ${Date.now() - page.t0} ms(ページを開いてから)`);
 	await page.shot('s0');
+	await page.touch(...(await page.gameCss(640, 360)));
+	await sleep(800);
+	const g = await page.state();
+	expect(g.screen === 'gate', `タッチでは始まらない(FR-29): ${g.screen}`);
 	await page.key('x');
 	expect(!!(await page.waitState((s) => s.screen === 'title')), 'キーで S1');
 	await sleep(300);
@@ -100,12 +105,44 @@ try {
 	const saved = await page.saved();
 	expect(saved?.training_done === true, `保存が root-call/save に入る: ${JSON.stringify(saved)}`);
 	expect((await page.evaluate(`localStorage.getItem('parry-duel/save')`)) === '{"version":1,"keep":"me"}', 'ParryDuel の保存を消さない');
-	await page.key('Enter');
-	expect(!!(await page.waitState((s) => s.screen === 'play', 3000)), 'もう1回(Enter)');
+	// コピー(FR-22): ボタンと、枠を選んで Ctrl+C
+	await page.evaluate(`navigator.clipboard.writeText('').catch(() => {})`);
+	await page.clickButton('copy');
+	await sleep(500);
+	const c1 = await page.clipboard();
+	expect(c1.startsWith('RootCall '), `コピーのボタン: ${JSON.stringify(c1).slice(0, 80)}`);
+	await page.evaluate(`navigator.clipboard.writeText('').catch(() => {})`);
+	await page.click(...(await page.gameCss(500, 440)));
+	await sleep(200);
+	await page.keyMod('a', 2);
+	await page.keyMod('c', 2);
+	await sleep(500);
+	const c2 = await page.clipboard();
+	expect(c2.startsWith('RootCall '), `枠を選んで Ctrl+C: ${JSON.stringify(c2).slice(0, 80)}`);
+	expect((await page.state()).screen === 'result', 'Ctrl 付きのキーでは画面が変わらない');
+	await page.key('Escape');
+	await sleep(400);
+	await page.key('r');
+	expect(!!(await page.waitState((s) => s.screen === 'play', 3000)), 'もう1回(R)');
 
 	const after = page.requests.filter((r) => r.at > loadedAt);
 	expect(after.length === 0, `読み込みの後の通信 ${after.length} 件(${Math.round((Date.now() - loadedAt) / 1000)} 秒見た)` + (after.length ? ': ' + after.map((r) => r.url).join(', ') : ''));
 	console.log('    転送した大きさ: ' + JSON.stringify(page.sizes()));
+	// キーの確かめの画面(?keys=1)
+	const base = page.url0.split('?')[0];
+	expect(await page.goto(base + '?keys=1&debug=1'), 'キーの確かめの画面を開き直す');
+	await page.waitState((s) => s.screen === 'gate', 20000);
+	await page.key('x');
+	expect(!!(await page.waitState((s) => s.screen === 'keys', 3000)), '?keys=1 でキーの確かめの画面');
+	await page.type('a=_/', 80);
+	await page.key('Tab');
+	await sleep(300);
+	await page.shot('keys');
+	const kl = (await page.state()).keys.slice(-5).map((k) => `${k.pk_name}/${k.label}/${k.unicode}`);
+	expect(kl.length === 5, `押したキーが出る: ${kl.join(' ')}`);
+	await page.key('Escape');
+	await page.key('Escape');
+	expect(!!(await page.waitState((s) => s.screen === 'title', 3000)), 'Esc 2 回でタイトルへ');
 	const errs = page.errors();
 	expect(errs.length === 0, `コンソールのエラー ${errs.length} 件` + (errs.length ? ': ' + errs.map((e) => e.text).slice(0, 5).join(' | ') : ''));
 } finally {

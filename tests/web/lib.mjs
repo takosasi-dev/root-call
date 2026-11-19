@@ -139,13 +139,35 @@ export async function open(url, metrics = DESKTOP) {
 	const booted = await waitFor(() => logs.some((l) => String(l.text).startsWith('Godot Engine v')), BOOT_TIMEOUT_MS, 50);
 	const evaluate = async (expression) => (await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result.value;
 	const page = {
-		cdp, logs, requests, booted: booted !== null, bootMs: Date.now() - t0,
+		cdp, logs, requests, booted: booted !== null, bootMs: Date.now() - t0, t0, url0: url,
 		sizes: () => ({ ...sizes }),
 		evaluate,
 		state: async () => { try { return JSON.parse(await evaluate('window.rcState') || '{}'); } catch { return {}; } },
 		stats: async () => { try { return JSON.parse(await evaluate('window.rcStats') || '{}'); } catch { return {}; } },
 		waitState: async (pred, timeoutMs = 15000) => waitFor(async () => { const s = await page.state(); return pred(s) ? s : null; }, timeoutMs, 50),
 		saved: async () => JSON.parse(await evaluate(`localStorage.getItem('${SAVE_KEY}')`) ?? 'null'),
+		// 同じプロフィールのまま別の URL を開き直す。Godot が起動するまで待つ
+		goto: async (to) => {
+			const from = logs.length;
+			await cdp.send('Page.navigate', { url: to });
+			return await waitFor(() => logs.slice(from).some((l) => String(l.text).startsWith('Godot Engine v')), BOOT_TIMEOUT_MS, 50) !== null;
+		},
+		touch: async (x, y) => {
+			await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+			await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 0 }] });
+			await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+			await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+		},
+		clipboard: async () => {
+			await cdp.send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] }).catch(() => {});
+			return await evaluate('navigator.clipboard.readText().catch((e) => "(読めない: " + e + ")")');
+		},
+		// 修飾キー付きで押す(modifiers: 2 = Ctrl、8 = Shift)
+		keyMod: async (k, modifiers) => {
+			const ev = { ...keyOf(k), modifiers, text: undefined };
+			await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...ev, commands: modifiers === 2 && k === 'a' ? ['selectAll'] : modifiers === 2 && k === 'c' ? ['copy'] : [] });
+			await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ev });
+		},
 		// 1 文字か特別なキー(Enter・Tab など)を押して離す
 		key: async (k) => {
 			const ev = keyOf(k);

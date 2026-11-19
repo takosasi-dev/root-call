@@ -87,20 +87,20 @@ func _draw_edges() -> void:
 
 func _draw_card(i: int, s: Dictionary, sans: Font, mono: Font, now: int) -> void:
 	var r := _card_rect(i)
-	var mark := "●"
+	var mark := S.MARK_OK
 	var word := S.CARD_OK
 	var edge := Kit.C_GOOD
 	match s["card"]:
 		"warn":
-			mark = "▲"
+			mark = S.MARK_WARN
 			word = S.CARD_WARN
 			edge = Kit.C_WARN
 		"down", "restart":
-			mark = "■"
+			mark = S.MARK_DOWN
 			word = S.CARD_DOWN if s["card"] == "down" else S.CARD_RESTART
 			edge = Kit.C_ERR
 		"impact":
-			mark = "◆"
+			mark = S.MARK_IMPACT
 			word = S.CARD_IMPACT
 			edge = Kit.C_ERR
 	var fill := Color(edge, 0.18) if s["card"] in ["down", "restart"] else Kit.C_BG

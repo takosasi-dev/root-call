@@ -181,3 +181,44 @@ func test_modifier_and_echo_keys() -> bool:
 	eq(m.play.sim.ed.keys, 2, "打鍵の数(c と BackSpace)")
 	_done(m)
 	return true
+
+
+func test_gate_ignores_touch_mouse() -> bool:
+	var m := _main()
+	var t := InputEventScreenTouch.new()
+	t.pressed = true
+	m._input(t)
+	var mb := InputEventMouseButton.new()
+	mb.pressed = true
+	mb.button_index = MOUSE_BUTTON_LEFT
+	mb.device = InputEvent.DEVICE_ID_EMULATION
+	m._input(mb)
+	eq(m.screen, "gate", "タッチと、そこから作られたマウスでは進まない(FR-29)")
+	ok(m._touch_note.visible, "キーボードで遊ぶ案内が出る")
+	_done(m)
+	return true
+
+
+func test_result_ignores_modifier_keys() -> bool:
+	var m := _main()
+	press(m, KEY_X, 120)
+	press(m, KEY_DOWN)
+	press(m, KEY_DOWN)
+	press(m, KEY_ENTER)
+	while not m.play.sim.is_over():
+		m.play.sim.step()
+	frames(m, 1)
+	m.play.finished.emit(m.play.sim.result())
+	m.current._shown_at -= 1000
+	frames(m, 1)
+	var e := kev(KEY_R, 114)
+	e.ctrl_pressed = true
+	m._input(e)
+	var e2 := kev(KEY_ENTER)
+	e2.alt_pressed = true
+	m._input(e2)
+	eq(m.screen, "result", "Ctrl・Alt 付きの R・Enter ではもう1回にならない(FR-27)")
+	press(m, KEY_R, 114)
+	eq(m.screen, "play", "R だけならもう1回")
+	_done(m)
+	return true
