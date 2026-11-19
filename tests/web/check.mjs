@@ -119,7 +119,7 @@ try {
 	const c1 = await page.clipboard();
 	expect(c1.startsWith('RootCall '), `コピーのボタン: ${JSON.stringify(c1).slice(0, 80)}`);
 	await page.evaluate(`navigator.clipboard.writeText('').catch(() => {})`);
-	await page.click(...(await page.gameCss(500, 440)));
+	await page.click(...(await page.gameCss(500, 500)));  // 共有の枠(y 462〜554)
 	await sleep(200);
 	await page.keyMod('a', 2);
 	await page.keyMod('c', 2);
