@@ -95,7 +95,7 @@ export function serve() {
 	const server = spawn(py, ['-m', 'http.server', String(HTTP_PORT), '--bind', '127.0.0.1', '--directory', root], { stdio: 'ignore' });
 	return {
 		url: `http://127.0.0.1:${HTTP_PORT}/root-call/`,
-		stop: () => { server.kill(); rmSync(path.join(root, 'root-call')); },
+		stop: () => { server.kill(); rmSync(path.join(root, 'root-call'), { force: true }); },
 	};
 }
 

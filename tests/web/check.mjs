@@ -81,8 +81,15 @@ try {
 	await page.shot('s2_play_db01');
 	await page.type('ssh db01\n', 30);
 	await page.waitState((s) => s.play?.loc === 3, 3000);
-	await page.type('sudo systemctl restart postgresql\n', 30);
+	// やさしい(既定): 空の行の Tab で直すコマンドが入る
+	await page.key('Tab');
+	await sleep(150);
+	expect((await line()) === 'restart', `やさしい: 空の行の Tab で直す形: "${await line()}"`);
+	await page.shot('s2_play_cause');
+	await page.key('Enter');
 	expect(!!(await page.waitState((s) => s.play?.fixed >= 2, 6000)), 'db01 を直すと 2 件目が直る');
+	await sleep(250);
+	await page.shot('s2_play_ripple');
 
 	// タブが裏に回ると一時停止(E-13)。戻っても自動では再開しない
 	await page.hide();

@@ -23,10 +23,12 @@ static func words(line: String) -> Array:
 
 
 # 補完の候補(§9.4 の表)。before は補う語の前にある語、loc は今いるサーバー(-1 = jump)。
-static func candidates(before: Array, loc: int) -> Array:
+static func candidates(before: Array, loc: int, easy: bool = false) -> Array:
 	var w := before
 	if w.is_empty():
-		return S.C_FIRST_JUMP if loc < 0 else S.C_FIRST_SERVER
+		if loc < 0:
+			return S.C_FIRST_JUMP
+		return S.C_EASY + S.C_FIRST_SERVER if easy else S.C_FIRST_SERVER
 	if w[0] == S.W_SUDO:
 		w = w.slice(1)
 		if w.is_empty():
@@ -65,6 +67,9 @@ static func execute(sim: RefCounted, line: String) -> void:
 	if w.is_empty():
 		_error(sim, S.E_NOT_FOUND % S.W_SUDO)
 		return
+	if sim.easy:
+		sudo = true  # やさしいは sudo を省いてよい
+		w = _expand(w, sim.loc)
 	if w[0] in S.FORBIDDEN_WORDS:
 		sim.out(S.E_FORBIDDEN, L_ERR)
 		sim.emit_event({"type": "forbidden"})
@@ -93,7 +98,10 @@ static func execute(sim: RefCounted, line: String) -> void:
 		S.W_HELP:
 			for s: String in S.HELP:
 				sim.out(s, L_INFO)
-			if sim.mode != 0:
+			if sim.easy:
+				for s: String in S.HELP_EASY:
+					sim.out(s, L_INFO)
+			elif sim.mode != 0:
 				for s: String in S.HELP_TABLE:
 					sim.out(s, L_INFO)
 		S.W_CLEAR:
@@ -145,6 +153,28 @@ static func execute(sim: RefCounted, line: String) -> void:
 			_admin(sim, sudo, w, S.A_FLUSH, loc == Srv.MAIL, {"op": "queue", "server": loc}, B.T_QUEUE)
 		_:
 			_error(sim, S.E_NOT_FOUND % w[0])
+
+
+# やさしいの短い形を元のコマンドに読み替える。restart はサービス名を省ける(jump では jump の誤りになる)。
+static func _expand(w: Array, loc: int) -> Array:
+	match w[0]:
+		S.W_RESTART:
+			if w.size() <= 2:
+				var unit: String = w[1] if w.size() == 2 else (S.SERVICES[loc] if loc >= 0 else "")
+				return [S.W_SYSTEMCTL, S.W_RESTART, unit]
+		S.W_VACUUM:
+			if w.size() == 1:
+				return [S.W_JOURNALCTL, S.A_VACUUM.to_lower()]
+		S.A_RENEW:
+			if w.size() == 1:
+				return [S.W_CERTBOT, S.A_RENEW]
+		S.W_FLUSH:
+			if w.size() == 1:
+				return [S.W_POSTQUEUE, S.A_FLUSH]
+		S.A_BACKUP:
+			if w.size() == 1:
+				return [S.W_SYSTEMCTL, S.W_START, S.A_BACKUP]
+	return w
 
 
 # sudo の要る、引数 1 つのコマンド。

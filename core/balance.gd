@@ -50,6 +50,12 @@ const DAY_SEED_MUL := 2654435761
 const DAY_SALT := 0x5243
 const EPOCH_YEAR := 2026
 
+# やさしい(§9.10 の追記)。整数の比で持つ(INV-3: 浮動小数を使わない)
+const EASY_GAP_NUM := 3  # 障害の間隔 ×3/2
+const EASY_GAP_DEN := 2
+const EASY_ESCALATE_MUL := 2  # 悪化して止まるまで ×2
+const EASY_RUN_DIV := 2  # コマンドの実行の時間 ÷2
+
 # テスト用の bot(§9.14)
 const BOT_KEY_TICKS := 12
 
@@ -67,3 +73,10 @@ const OVER_MS := 600
 const RETRY_LOCK_MS := 300
 const CURSOR_BLINK_MS := 500
 const REDUCED_FLASH_ALPHA := 0.2
+# 監視室の演出(v0.2.0)。ms
+const PACKET_MS := 1600  # 光の粒が 1 本の矢印を流れきる時間
+const PING_MS := 1400  # 原因の札の輪が 1 回広がる時間
+const RIPPLE_MS := 700  # 直った札から出る波紋
+const EDGE_PULSE_MS := 700  # 障害が来た時の画面の縁
+const BLINK_MS := 500  # 止まった札の灯の明滅
+const SPARK_SECONDS := 60  # 上の帯の稼働の折れ線(直近の秒数)

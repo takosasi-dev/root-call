@@ -14,12 +14,14 @@ const QUEUE := 5
 const BACKUP := 6
 
 
-static func make(id: int, kind: int, server: int, tick: int, nth: int) -> Dictionary:
+static func make(id: int, kind: int, server: int, tick: int, nth: int, easy: bool = false) -> Dictionary:
 	var total := 0
 	if kind == DISK:
 		total = B.DISK_ESCALATE
 	elif kind == LEAK:
 		total = B.LEAK_ESCALATE
+	if easy:
+		total *= B.EASY_ESCALATE_MUL
 	return {"id": id, "kind": kind, "origin": kind, "server": server, "start": tick, "fixed": -1,
 		"left": total, "total": total, "escalated": false, "nth": nth}
 
@@ -107,6 +109,25 @@ static func fix_command(srv: Srv, inc: Dictionary) -> String:
 	return ""
 
 
+# やさしいの短い形(shell.gd が元のコマンドに読み替える)。
+static func short_command(srv: Srv, inc: Dictionary) -> String:
+	var i: int = inc["server"]
+	match int(inc["kind"]):
+		DOWN:
+			return S.W_VACUUM if srv.disk[i] >= B.DISK_ALERT else S.W_RESTART
+		DISK:
+			return S.W_VACUUM
+		LEAK:
+			return S.W_RESTART
+		CERT:
+			return S.A_RENEW
+		QUEUE:
+			return S.W_FLUSH
+		BACKUP:
+			return S.A_BACKUP
+	return ""
+
+
 # アラートの行の文(§9.7)。
 static func text(srv: Srv, inc: Dictionary) -> String:
 	var i: int = inc["server"]
@@ -123,11 +144,14 @@ static func text(srv: Srv, inc: Dictionary) -> String:
 
 
 # 下書き(§9.11 の表)。n は、その夜でその種類が出た回数。full なら n に関わらず全部(研修の夜)。
-static func hint(srv: Srv, inc: Dictionary, full: bool) -> String:
+# easy なら毎回、短い形で出す。
+static func hint(srv: Srv, inc: Dictionary, full: bool, easy: bool = false) -> String:
 	var n: int = inc["nth"]
+	var head := "%s %s" % [S.W_SSH, S.SERVERS[int(inc["server"])]]
+	if easy:
+		return head + S.HINT_ARROW + short_command(srv, inc)
 	if not full and n >= 3:
 		return ""
-	var head := "%s %s" % [S.W_SSH, S.SERVERS[int(inc["server"])]]
 	var cmd := fix_command(srv, inc)
 	if not full and n == 2:
 		cmd = cmd.split(" ")[0] + S.HINT_MORE

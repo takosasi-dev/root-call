@@ -70,7 +70,7 @@ func test_training_done_and_settings() -> bool:
 	st.set_setting("shake", false)
 	var again := Store.new(P)
 	ok(again.training_done(), "研修を終えたが残る")
-	eq(again.settings(), {"volume": 25, "shake": false, "reduce_flash": false}, "設定が残る")
+	eq(again.settings(), {"volume": 25, "shake": false, "reduce_flash": false, "easy": true}, "設定が残る")
 	return true
 
 

@@ -29,7 +29,8 @@ static func training() -> Array:
 	return out
 
 
-static func build(seed_value: int) -> Array:
+# easy なら間隔を EASY_GAP_NUM/DEN 倍にする(種類とサーバーの並びは同じ)。
+static func build(seed_value: int, easy: bool = false) -> Array:
 	var rng := Rng.new(seed_value)
 	var total := 0
 	for row: Array in B.SCHED_TABLE:
@@ -50,6 +51,8 @@ static func build(seed_value: int) -> Array:
 				break
 		for gap: Array in B.SCHED_GAPS:
 			if t < int(gap[0]):
-				t += int(gap[1]) + rng.next_int(int(gap[2]))
+				var g := int(gap[1]) + rng.next_int(int(gap[2]))
+				@warning_ignore("integer_division")
+				t += g * B.EASY_GAP_NUM / B.EASY_GAP_DEN if easy else g
 				break
 	return out

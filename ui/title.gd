@@ -37,12 +37,16 @@ func build(store: RefCounted, day: int, date: String) -> void:
 		var what := String(b.name)
 		b.pressed.connect(func() -> void: chosen.emit(what))
 	# 記録
-	var d: Dictionary = store.daily(day)
+	var easy: bool = store.settings()["easy"]
+	var lv := Kit.label("%s  %s" % [S.SET_LEVEL, S.LEVEL[1 if easy else 0]], 18, Kit.C_GOOD if easy else Kit.C_DIM, 700)
+	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	add_child(Kit.place(lv, settings.position.x + settings.size.x + 24, settings.position.y, 360, settings.size.y))
+	var d: Dictionary = store.daily(day, easy)
 	var rec := S.REC_NONE
 	if d["first"] != null:
 		rec = (S.REC_FIRST % Score.comma(d["first"]["points"])) + " / " + (S.REC_TODAY_BEST % Score.comma(d["best"]["points"]))
 	_note(rec, daily)
-	var pb: Variant = store.practice_best()
+	var pb: Variant = store.practice_best(easy)
 	if pb != null:
 		_note(S.REC_BEST % Score.comma(pb["points"]), practice)
 	var prompt := Kit.label(S.PROMPT % S.JUMP + "_", 18, Color(Kit.C_PROMPT, 0.35), 400, Kit.mono())

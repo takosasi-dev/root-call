@@ -94,6 +94,24 @@ static func place(c: Control, x: float, y: float, w: float, h: float) -> Control
 	return c
 
 
+# 健全さ(0〜20)の折れ線。slots 個分の幅に右詰めで描く。線は青、末尾の点だけ今の健全さの色。
+static func draw_health(ci: CanvasItem, box: Rect2, values: Array, slots: int) -> void:
+	if values.size() < 2:
+		return
+	var pts := PackedVector2Array()
+	var step := box.size.x / float(maxi(slots - 1, 1))
+	var x0 := box.end.x - step * (values.size() - 1)
+	for k in values.size():
+		pts.append(Vector2(x0 + step * k, box.end.y - box.size.y * int(values[k]) / 20.0))
+	var fill := pts.duplicate()
+	fill.append(Vector2(pts[-1].x, box.end.y))
+	fill.append(Vector2(pts[0].x, box.end.y))
+	ci.draw_colored_polygon(fill, Color(C_PROMPT, 0.12))
+	ci.draw_polyline(pts, C_PROMPT, 2.0, true)
+	var last := int(values[-1])
+	ci.draw_circle(pts[-1], 3.5, C_GOOD if last >= 16 else (C_WARN if last >= 8 else C_ERR))
+
+
 # 文字を幅で折り返す(日本語は空白が無いので 1 文字ずつ測る)。
 static func wrap(f: Font, text: String, size: int, width: float) -> PackedStringArray:
 	var out := PackedStringArray()

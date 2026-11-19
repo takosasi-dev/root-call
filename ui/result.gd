@@ -18,10 +18,14 @@ var _shown_at := 0
 var _points_label: Label
 var _retry: Button
 var _copied: Label
+var _history: Array = []
+const CHART := Rect2(290, 300, 700, 64)
 
 
 # rec は save_store.record() の戻り値。
-func build(mode: int, result: Dictionary, rec: Dictionary, share_text: String) -> void:
+# history は 1 秒ごとの健全さ(夜の推移の折れ線)。
+func build(mode: int, result: Dictionary, rec: Dictionary, share_text: String, history: Array = []) -> void:
+	_history = history
 	size = Vector2(1280, 720)
 	share = share_text
 	_points = int(result["points"])
@@ -54,7 +58,10 @@ func build(mode: int, result: Dictionary, rec: Dictionary, share_text: String) -
 		bk = S.RES_BACKUP_NG % (int(result["backups_left"]) * B.BACKUP_PENALTY)
 	row.add_child(Kit.label(bk, 22, Kit.C_ERR if int(result["backups_left"]) > 0 else Kit.C_TEXT, 500))
 	add_child(Kit.place(row, 0, y, 1280, 40))
-	_retry = Kit.place(Kit.button("retry", S.B_RETRY, 30), 490, 310, 300, 72)
+	var cap := Kit.label(S.RES_CHART, 14, Kit.C_DIM, 500)
+	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	add_child(Kit.place(cap, CHART.position.x, CHART.position.y - 4, 300, 20))
+	_retry = Kit.place(Kit.button("retry", S.B_RETRY, 30), 490, 384, 300, 64)
 	_retry.disabled = true
 	add_child(_retry)
 	var box := TextEdit.new()
@@ -66,23 +73,32 @@ func build(mode: int, result: Dictionary, rec: Dictionary, share_text: String) -
 	box.add_theme_font_override("font", Kit.mono())
 	box.add_theme_font_size_override("font_size", 18)
 	box.add_theme_color_override("font_readonly_color", Kit.C_TERM_TEXT)
-	add_child(Kit.place(box, 290, 400, 700, 104))
-	var copy := Kit.place(Kit.button("copy", S.B_COPY, 24), 420, 520, 200, 60)
-	var title := Kit.place(Kit.button("title", S.B_TITLE, 24), 660, 520, 200, 60)
+	add_child(Kit.place(box, 290, 462, 700, 92))
+	var copy := Kit.place(Kit.button("copy", S.B_COPY, 24), 420, 566, 200, 56)
+	var title := Kit.place(Kit.button("title", S.B_TITLE, 24), 660, 566, 200, 56)
 	add_child(copy)
 	add_child(title)
 	_copied = Kit.label("", 18, Kit.C_DIM)
-	add_child(Kit.place(_copied, 0, 588, 1280, 30))
+	add_child(Kit.place(_copied, 0, 626, 1280, 28))
 	var notes: Array = []
 	if rec.get("first_training", false):
 		notes.append(S.RES_TRAINING_DONE)
 	if not rec.get("saved", true):
 		notes.append(S.SAVE_FAILED)
-	add_child(Kit.place(Kit.label("\n".join(notes), 20, Kit.C_GOOD), 0, 624, 1280, 70))
+	add_child(Kit.place(Kit.label("\n".join(notes), 20, Kit.C_GOOD), 0, 654, 1280, 60))
 	_retry.pressed.connect(func() -> void: retry.emit())
 	copy.pressed.connect(_copy)
 	title.pressed.connect(func() -> void: to_title.emit())
 	menu = Menu.new([_retry, copy, title] as Array[Button], 0)
+
+
+# 夜の健全さの推移(240 秒ぶん)。
+@warning_ignore("integer_division")
+func _draw() -> void:
+	var body := Rect2(CHART.position + Vector2(0, 18), CHART.size - Vector2(0, 18))
+	draw_rect(body, Kit.C_PANEL)
+	draw_line(body.position, Vector2(body.end.x, body.position.y), Color(Kit.C_GOOD, 0.2), 1.0)
+	Kit.draw_health(self, body.grow(-2), _history, B.NIGHT_TICKS / B.TICK_HZ)
 
 
 func _copy() -> void:

@@ -94,7 +94,8 @@ func test_result_retry_locked_300ms() -> bool:
 	press(m, KEY_R)
 	eq(m.screen, "result", "300 ms の前は押せない")
 	ok(m.current.share.begins_with("RootCall "), "共有する文字")
-	ok(m.store.practice_best() != null, "練習の夜の最高を保存")
+	ok(m.store.practice_best(true) != null and m.store.practice_best() == null, "練習の夜の最高を、やさしい(既定)の所に保存")
+	ok(m.current.share.contains(S.SHARE_EASY), "共有する文字に、やさしい")
 	_done(m)
 	return true
 
@@ -134,7 +135,8 @@ func test_pause_settings_back() -> bool:
 	press(m, KEY_ENTER)
 	eq(m.screen, "settings", "一時停止から設定")
 	press(m, KEY_DOWN)
-	press(m, KEY_ENTER)  # 揺れを切る
+	press(m, KEY_DOWN)
+	press(m, KEY_ENTER)  # 揺れを切る(上から 難しさ・音量・揺れ)
 	eq(m.store.settings()["shake"], false, "揺れを切って保存")
 	press(m, KEY_ESCAPE)
 	eq(m.screen, "play", "戻ると一時停止へ")

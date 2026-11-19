@@ -1,5 +1,6 @@
 # 保存の読み書き(仕様書 §9.15・FR-23・E-14・E-15)。研修を終えたか・練習の夜の最高・今日の夜の記録・設定を持つ。
 # 置き場: Web はブラウザの localStorage の root-call/save(共通 §3 の 10。user:// は同じサイトのゲーム全部で 1 つなので使わない)、
+# やさしいの記録は practice_best_easy・daily_easy に分けて持つ(ふつうの記録は v0.1.0 と同じ所)。
 # それ以外は user://save.json。読めない・壊れている・version が違う時は既定値で始め、書けなくても止めない。作りは ParryDuel の save_store。
 extends RefCounted
 
@@ -26,11 +27,17 @@ func _init(p_path: String = PATH) -> void:
 
 
 static func default_settings() -> Dictionary:
-	return {"volume": B.DEFAULT_VOLUME, "shake": true, "reduce_flash": false}
+	return {"volume": B.DEFAULT_VOLUME, "shake": true, "reduce_flash": false, "easy": true}
 
 
 static func defaults() -> Dictionary:
-	return {"version": VERSION, "training_done": false, "practice_best": null, "daily": null, "settings": default_settings()}
+	return {"version": VERSION, "training_done": false, "practice_best": null, "daily": null,
+		"practice_best_easy": null, "daily_easy": null, "settings": default_settings()}
+
+
+# 難しさごとの記録の置き場の名前。
+static func _k(name: String, easy: bool) -> String:
+	return name + "_easy" if easy else name
 
 
 func load_data() -> void:
@@ -77,15 +84,16 @@ static func parse(text: String) -> Variant:
 		return null
 	var out := defaults()
 	out["training_done"] = v.get("training_done") == true
-	out["practice_best"] = _record(v.get("practice_best"))
-	var d: Variant = v.get("daily")
-	if d is Dictionary and _is_num(d.get("day")):
-		out["daily"] = {"day": int(d["day"]), "first": _record(d.get("first")), "best": _record(d.get("best"))}
+	for e: bool in [false, true]:
+		out[_k("practice_best", e)] = _record(v.get(_k("practice_best", e)))
+		var d: Variant = v.get(_k("daily", e))
+		if d is Dictionary and _is_num(d.get("day")):
+			out[_k("daily", e)] = {"day": int(d["day"]), "first": _record(d.get("first")), "best": _record(d.get("best"))}
 	var st: Variant = v.get("settings")
 	if st is Dictionary:
 		if _is_num(st.get("volume")) and int(st["volume"]) in B.VOLUMES:
 			out["settings"]["volume"] = int(st["volume"])
-		for k: String in ["shake", "reduce_flash"]:
+		for k: String in ["shake", "reduce_flash", "easy"]:
 			if st.get(k) is bool:
 				out["settings"][k] = st[k]
 	return out
@@ -116,15 +124,18 @@ func _merge_from_disk() -> void:
 	if disk == null:
 		return
 	data["training_done"] = data["training_done"] or disk["training_done"]
-	data["practice_best"] = _better_of(data["practice_best"], disk["practice_best"])
-	var mine: Variant = data["daily"]
-	var theirs: Variant = disk["daily"]
-	if theirs is Dictionary:
-		if not (mine is Dictionary) or int(theirs["day"]) > int(mine["day"]):
-			data["daily"] = theirs
-		elif int(theirs["day"]) == int(mine["day"]):
-			data["daily"] = {"day": mine["day"], "first": theirs["first"] if theirs["first"] != null else mine["first"],
-				"best": _better_of(mine["best"], theirs["best"])}
+	for e: bool in [false, true]:
+		var pk := _k("practice_best", e)
+		var dk := _k("daily", e)
+		data[pk] = _better_of(data[pk], disk[pk])
+		var mine: Variant = data[dk]
+		var theirs: Variant = disk[dk]
+		if theirs is Dictionary:
+			if not (mine is Dictionary) or int(theirs["day"]) > int(mine["day"]):
+				data[dk] = theirs
+			elif int(theirs["day"]) == int(mine["day"]):
+				data[dk] = {"day": mine["day"], "first": theirs["first"] if theirs["first"] != null else mine["first"],
+					"best": _better_of(mine["best"], theirs["best"])}
 
 
 func save_data() -> bool:
@@ -137,13 +148,13 @@ func training_done() -> bool:
 	return data["training_done"]
 
 
-func practice_best() -> Variant:
-	return data["practice_best"]
+func practice_best(easy: bool = false) -> Variant:
+	return data[_k("practice_best", easy)]
 
 
 # 今日の記録 { day, first, best }。日付が違えば空の物(保存はまだ書き換えない)。
-func daily(day: int) -> Dictionary:
-	var d: Variant = data["daily"]
+func daily(day: int, easy: bool = false) -> Dictionary:
+	var d: Variant = data[_k("daily", easy)]
 	if d is Dictionary and int(d["day"]) == day:
 		return d
 	return {"day": day, "first": null, "best": null}
@@ -151,22 +162,24 @@ func daily(day: int) -> Dictionary:
 
 # 結果画面に入った時に呼ぶ(FR-23)。mode: 0 = 今日の夜、1 = 研修の夜、2 = 練習の夜。
 # { prev_best, new_best, first_today, first_training, saved } を返す。
-func record(mode: int, day: int, result: Dictionary) -> Dictionary:
+func record(mode: int, day: int, result: Dictionary, easy: bool = false) -> Dictionary:
+	var pk := _k("practice_best", easy)
+	var dk := _k("daily", easy)
 	var rec := {"points": int(result["points"]), "mttr10": int(result["mttr10"])}
 	var out := {"prev_best": null, "new_best": false, "first_today": false, "first_training": false, "saved": true}
 	if mode == 1:
 		out["first_training"] = not data["training_done"]
 		data["training_done"] = true
 	elif mode == 2:
-		out["prev_best"] = data["practice_best"]
+		out["prev_best"] = data[pk]
 		out["new_best"] = out["prev_best"] == null or Score.better(rec, out["prev_best"])
 		if out["new_best"]:
-			data["practice_best"] = rec
+			data[pk] = rec
 	else:
-		var stored: Variant = data["daily"]
+		var stored: Variant = data[dk]
 		if stored is Dictionary and int(stored["day"]) > day:
 			return out  # 日付をまたいだ古い日の回(E-17)。新しい日の記録を置き換えない
-		var today := daily(day)
+		var today := daily(day, easy)
 		out["prev_best"] = today["best"]
 		out["new_best"] = today["best"] == null or Score.better(rec, today["best"])
 		if today["first"] == null:
@@ -174,7 +187,7 @@ func record(mode: int, day: int, result: Dictionary) -> Dictionary:
 			out["first_today"] = true
 		if out["new_best"]:
 			today["best"] = rec
-		data["daily"] = today
+		data[dk] = today
 	out["saved"] = save_data()
 	return out
 

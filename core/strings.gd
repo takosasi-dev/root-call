@@ -3,7 +3,7 @@
 extends RefCounted
 
 const NAME := "RootCall"
-const VERSION := "v0.1.0"
+const VERSION := "v0.2.0"
 const URL := "https://takosasi-dev.github.io/root-call/"
 
 # サーバー(番号は servers.gd の WEB01〜MAIL)とサービス(§9.2)
@@ -28,6 +28,9 @@ const W_FREE := "free"
 const W_JOURNALCTL := "journalctl"
 const W_CERTBOT := "certbot"
 const W_POSTQUEUE := "postqueue"
+# やさしいの短い形(renew・backup は A_RENEW・A_BACKUP と同じ語)
+const W_VACUUM := "vacuum"
+const W_FLUSH := "flush"
 const A_BACKUP := "backup"
 const A_VACUUM := "--vacuum-size=200M"
 const A_RENEW := "renew"
@@ -39,6 +42,7 @@ const FORBIDDEN_WORDS := ["rm", "reboot", "chmod", "shutdown", "kill"]
 # 補完の候補(§9.4)
 const C_FIRST_JUMP := ["ssh", "status", "help", "clear", "history"]
 const C_FIRST_SERVER := ["exit", "ssh", "sudo", "systemctl", "df", "free", "journalctl", "certbot", "postqueue", "help", "clear", "history"]
+const C_EASY := ["restart", "vacuum", "renew", "flush", "backup"]
 const C_SUDO := ["systemctl", "journalctl", "certbot", "postqueue"]
 const C_SYSTEMCTL := ["status", "restart", "start"]
 
@@ -98,10 +102,22 @@ const HELP_TABLE := [
 	"  バックアップの失敗  sudo systemctl start backup",
 ]
 
+const HELP_EASY := [
+	"やさしい: sudo は省いてよい。直すコマンドは短い形でも通る",
+	"  restart(再起動)  vacuum(ログを消す)  renew(証明書)  flush(送信待ち)  backup(取り直す)",
+	"  直したいサーバーに入って、空の行で Tab を押すと、直すコマンドが入る",
+]
+
 # 研修の夜の案内(§9.11)
 const GUIDE := [
 	"障害の行の下に、直し方の下書きが出る。そのとおりに打てば直る",
 	"ssh <サーバー名> でサーバーに入り、exit で jump に戻る",
+	"Tab で続きを補える(行末なら → でも同じ)",
+]
+
+const GUIDE_EASY := [
+	"赤い札が原因。障害の行の下の下書きのとおりに打てば直る",
+	"ssh <サーバー名> でサーバーに入る。入ったら空の行で Tab → Enter で直る",
 	"Tab で続きを補える(行末なら → でも同じ)",
 ]
 
@@ -118,6 +134,10 @@ const EXPLAIN := ["影響: この札は巻き込まれているだけ。矢印�
 	"送信待ちの詰まり: メールが送られずにたまっている。送り出せば戻る",
 	"バックアップの失敗: 夜のバックアップが失敗した。止まりはしないが、朝までに取り直す"]
 const UPSTREAM := "上流を見る(web → app → db・cache)"
+const IMPACT_FOLD := "影響 %d 台(%s)"
+const IMPACT_FOLD_NOTE := "巻き込まれているだけ。上の原因の行を直せば戻る"
+const IMPACT_SEP := "・"
+const CAUSE := "原因"
 const HINT_ARROW := " → "
 const HINT_MORE := " …"
 
@@ -164,6 +184,7 @@ const RES_UPTIME := "稼働率 %s%%"
 const RES_MTTR := "平均の復旧 %s 秒"
 const RES_KEYS := "打鍵 %d"
 const RES_FIXED := "直した数 %d"
+const RES_CHART := "夜の健全さの推移(上が満点)"
 const RES_BACKUP_OK := "バックアップ 済み"
 const RES_BACKUP_NG := "バックアップ 未対応 −%d"
 const RES_TRAINING_DONE := "研修を終えた。次は今日の夜へ"
@@ -176,6 +197,9 @@ const SETTINGS := "設定"
 const SET_VOLUME := "音量"
 const SET_SHAKE := "画面の揺れ"
 const SET_FLASH := "点滅を弱める"
+const SET_LEVEL := "難しさ"
+const LEVEL := ["ふつう", "やさしい"]
+const LEVEL_NOTE := "やさしい: 障害がゆっくり・sudo 省略・短いコマンド・空の行の Tab で直し方が入る"
 const ON := "入"
 const OFF := "切"
 const B_BACK := "戻る"
@@ -189,6 +213,7 @@ const SHARE_BODY := "稼働率 %s%% / 平均の復旧 %s 秒 / 打鍵 %d"
 const SHARE_BACKUP := " / バックアップ 未対応"
 const MODE_LABEL := ["今日の夜", "研修の夜", "練習の夜"]
 const DAILY_FIRST := "今日の夜・1回目"
+const SHARE_EASY := "・やさしい"
 
 # キーの確かめの画面(共通 §3 の 22。?keys=1 の時だけ)
 const KEYS_TITLE := "キーの確かめ(押したキーを下に出す。Esc 2 回でタイトルへ)"

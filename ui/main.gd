@@ -167,6 +167,8 @@ func _today() -> Dictionary:
 
 func _start(n: Dictionary) -> void:
 	_clear()
+	if not n.has("easy"):
+		n["easy"] = store.settings()["easy"]  # 始めた時の難しさで夜を通す(もう1回も同じ)
 	night = n
 	screen = "play"
 	play = Play.new()
@@ -174,7 +176,7 @@ func _start(n: Dictionary) -> void:
 	play.shake_on = st["shake"]
 	play.reduce_flash = st["reduce_flash"]
 	stage.add_child(play)
-	play.start(int(n["mode"]), int(n["seed"]))
+	play.start(int(n["mode"]), int(n["seed"]), n["easy"])
 	play.finished.connect(_on_finished)
 	play.pause_requested.connect(_pause)
 	current = play
@@ -197,6 +199,7 @@ func _on_pause(what: String) -> void:
 			pause_view = null
 			play.paused = false  # 押した tick から再開(待ち時間なし)
 		"restart":
+			night.erase("easy")  # 一時停止中に設定で難しさを変えたら、やり直しで効く
 			_start(night)
 		"settings":
 			_show_settings("pause")
@@ -223,12 +226,13 @@ func _watch_visibility() -> void:
 
 func _on_finished(result: Dictionary) -> void:
 	var n := night
-	var rec := store.record(int(n["mode"]), int(n["day"]), result)
-	var text := Share.make(n["date"], int(n["mode"]), rec["first_today"], result)
+	var rec := store.record(int(n["mode"]), int(n["day"]), result, n["easy"])
+	var text := Share.make(n["date"], int(n["mode"]), rec["first_today"], result, n["easy"])
+	var hist: Array = play.history.duplicate() if play != null else []
 	_clear()
 	screen = "result"
 	var r := Result.new()
-	r.build(int(n["mode"]), result, rec, text)
+	r.build(int(n["mode"]), result, rec, text, hist)
 	r.retry.connect(func() -> void: _start(night))  # FR-21: 同じ入口。今日の夜は同じ種
 	r.to_title.connect(_show_title)
 	stage.add_child(r)

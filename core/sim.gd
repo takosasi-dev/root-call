@@ -17,6 +17,7 @@ const MODE_PRACTICE := 2
 
 var seed_value := 1
 var mode := MODE_DAILY
+var easy := false  # やさしい(間隔・悪化・実行の時間・短い形・空の行の Tab)
 var tick := 0
 var over := false
 var srv := Srv.new()
@@ -36,17 +37,18 @@ var _next_id := 1
 
 
 # plan_override はテスト用(障害の並びを差し替える)。
-func _init(p_seed: int, p_mode: int, plan_override: Variant = null) -> void:
+func _init(p_seed: int, p_mode: int, plan_override: Variant = null, p_easy: bool = false) -> void:
 	seed_value = p_seed
 	mode = p_mode
+	easy = p_easy
 	if plan_override is Array:
 		plan = plan_override
 	elif mode == MODE_TRAINING:
 		plan = Sched.training()
 	else:
-		plan = Sched.build(p_seed)
+		plan = Sched.build(p_seed, easy)
 	if mode == MODE_TRAINING:
-		for s: String in S.GUIDE:
+		for s: String in (S.GUIDE_EASY if easy else S.GUIDE):
 			out(s, Shell.L_INFO)
 
 
@@ -120,7 +122,9 @@ func _key(code: int) -> void:
 		ed.commit()
 		Shell.execute(self, line)
 	elif r == Ed.TAB:
-		var res := ed.complete(Shell.candidates(ed.words_before(), loc))
+		if easy and ed.text.strip_edges().is_empty() and _fill_fix():
+			return
+		var res := ed.complete(Shell.candidates(ed.words_before(), loc, easy))
 		if res["result"] == "none":
 			emit_event({"type": "bell"})
 		elif res["result"] == "list":
@@ -128,12 +132,23 @@ func _key(code: int) -> void:
 			out("  ".join(res["list"]), Shell.L_INFO)
 
 
+# やさしい: 空の行の Tab で、今いるサーバーの一番古い障害を直す短い形を入れる。無ければ偽(ふつうの補完へ)。
+func _fill_fix() -> bool:
+	if loc < 0:
+		return false
+	for inc: Dictionary in active():
+		if int(inc["server"]) == loc:
+			ed._put_line(I.short_command(srv, inc))
+			return true
+	return false
+
+
 func _spawn(kind: int, server: int) -> void:
 	for inc: Dictionary in incidents:
 		if int(inc["fixed"]) < 0 and int(inc["kind"]) == kind and int(inc["server"]) == server:
 			return  # D-11・E-9
 	_seen[kind] = int(_seen.get(kind, 0)) + 1
-	var inc := I.make(_next_id, kind, server, tick, _seen[kind])
+	var inc := I.make(_next_id, kind, server, tick, _seen[kind], easy)
 	_next_id += 1
 	I.apply(srv, inc)
 	incidents.append(inc)
@@ -167,7 +182,9 @@ func emit_event(e: Dictionary) -> void:
 
 
 func begin(op: Dictionary, ticks: int) -> void:
-	running = {"op": op, "left": ticks, "total": ticks}
+	@warning_ignore("integer_division")
+	var t := ticks / B.EASY_RUN_DIV if easy else ticks
+	running = {"op": op, "left": t, "total": t}
 
 
 # 再起動に失敗して止まった。止まりを数える障害がまだ無ければ「停止」を足す(§9.5 の app の決まり)。
@@ -197,7 +214,7 @@ func alert_rows() -> Array:
 		rows.append({"server": inc["server"], "text": I.text(srv, inc), "start": inc["start"], "id": inc["id"],
 			"class": "down" if int(inc["kind"]) == I.DOWN else "warn", "incident": true,
 			"left": int(inc["left"]) if esc else -1, "total": int(inc["total"]) if esc else 0,
-			"hint": I.hint(srv, inc, full), "explain": S.EXPLAIN[int(inc["origin"])] if full else "", "upstream": ""})
+			"hint": I.hint(srv, inc, full, easy), "explain": S.EXPLAIN[int(inc["origin"])] if full else "", "upstream": ""})
 	for i in Srv.COUNT:
 		var imp := srv.impact(i)
 		if imp != 0 and impact_since[i] >= 0:
@@ -231,10 +248,11 @@ func snapshot() -> Dictionary:
 			if int(inc["server"]) == i and int(inc["total"]) > 0 and not inc["escalated"]:
 				left = int(inc["left"])
 				total = int(inc["total"])
-		servers.append({"name": S.SERVERS[i], "service": S.SERVICES[i], "card": _card(i), "disk": srv.disk[i],
+		var cause := active().any(func(inc: Dictionary) -> bool: return int(inc["server"]) == i)
+		servers.append({"name": S.SERVERS[i], "service": S.SERVICES[i], "card": _card(i), "cause": cause, "disk": srv.disk[i],
 			"mem": srv.mem[i], "left": left, "total": total})
 	return {
-		"tick": tick, "over": over, "mode": mode, "loc": loc, "prompt": prompt(), "line": ed.text, "cursor": ed.cursor,
+		"tick": tick, "over": over, "mode": mode, "easy": easy, "loc": loc, "prompt": prompt(), "line": ed.text, "cursor": ed.cursor,
 		"keys": ed.keys, "running": is_running(), "run_left": int(running.get("left", 0)), "run_total": int(running.get("total", 0)),
 		"lines": lines, "servers": servers, "edges": srv.edges_hot(), "alerts": alert_rows(),
 		"uptime100": Score.uptime100(health_sum, tick), "mttr10": Score.mttr10(incidents, tick, true), "health": srv.health(),

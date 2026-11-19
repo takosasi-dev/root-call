@@ -6,8 +6,11 @@ const Score := preload("res://core/score.gd")
 
 
 # mode: 0 = 今日の夜、1 = 研修の夜、2 = 練習の夜。first_today は今日の夜の 1 回目か。
-static func make(date: String, mode: int, first_today: bool, result: Dictionary) -> String:
+# easy なら見出しに「・やさしい」を足す。
+static func make(date: String, mode: int, first_today: bool, result: Dictionary, easy: bool = false) -> String:
 	var label: String = S.DAILY_FIRST if mode == 0 and first_today else S.MODE_LABEL[mode]
+	if easy:
+		label += S.SHARE_EASY
 	var body := S.SHARE_BODY % [Score.pct1(int(result["uptime100"])), Score.sec1(maxi(int(result["mttr10"]), 0)), int(result["keys"])]
 	if int(result["backups_left"]) > 0:
 		body += S.SHARE_BACKUP
